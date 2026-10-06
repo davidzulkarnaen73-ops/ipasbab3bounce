@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BounceQuiz AI - IPAS Kelas 6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0fdf4; /* Light green background */
+            margin: 0;
+            overflow: hidden; /* Prevent scrolling during game */
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        h1, h2, h3, .fredoka-font {
+            font-family: 'Fredoka', sans-serif;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: inset 0 4px 6px -1px rgba(0, 0, 0, 0.1), inset 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Fun animations for modal */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop-in {
+            animation: popIn 0.3s ease-out forwards;
+        }
+
+        /* Option buttons styling */
+        .mc-btn {
+            transition: all 0.2s ease;
+        }
+        .mc-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .mc-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- Header Section -->
+    <header class="bg-emerald-600 text-white p-4 shadow-md z-10 flex flex-col sm:flex-row justify-between items-center shrink-0">
+        <div class="text-center sm:text-left mb-2 sm:mb-0">
+            <h1 class="text-3xl font-bold tracking-wide drop-shadow-md">BounceQuiz AI</h1>
+            <p class="text-emerald-100 text-sm font-semibold">IPAS | Kedatangan Bangsa Asing ke Indonesia | Kelas 6 SD</p>
+        </div>
+        <div class="flex gap-4 bg-emerald-700/50 p-2 rounded-lg border border-emerald-500/30">
+            <div class="text-center px-4 py-1 border-r border-emerald-500/50">
+                <p class="text-xs text-emerald-200 uppercase tracking-wider font-bold">Terjawab</p>
+                <p class="text-2xl font-bold fredoka-font"><span id="progressText">0</span> <span class="text-lg">/ 20</span></p>
+            </div>
+            <div class="text-center px-4 py-1">
+                <p class="text-xs text-emerald-200 uppercase tracking-wider font-bold">Skor</p>
+                <p class="text-2xl font-bold fredoka-font text-yellow-300" id="scoreText">0</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="flex-grow p-4 relative flex items-center justify-center">
+        <!-- Canvas Container -->
+        <div class="w-full h-full relative" id="canvasContainer">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+
+        <!-- Question Modal -->
+        <div id="questionModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-pop-in">
+                <!-- Modal Header -->
+                <div class="bg-blue-500 p-4 text-white flex justify-between items-center">
+                    <h2 class="text-xl font-bold fredoka-font">Soal Nomor <span id="modalQuestionNumber"></span></h2>
+                    <span id="questionTypeBadge" class="px-3 py-1 bg-blue-600 rounded-full text-xs font-bold uppercase"></span>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="p-6">
+                    <p id="questionText" class="text-lg font-semibold mb-6 text-gray-800 leading-relaxed"></p>
+
+                    <!-- Multiple Choice Area -->
+                    <div id="mcArea" class="hidden flex flex-col gap-3">
+                        <!-- Options will be injected here -->
+                    </div>
+
+                    <!-- Oral Answer Area -->
+                    <div id="oralArea" class="hidden">
+                        <!-- Button to Reveal Key -->
+                        <div id="revealOralBtnContainer" class="text-center my-4">
+                            <button onclick="revealOralKey()" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mx-auto hover:scale-105 active:scale-95">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                Cek Jawaban / Kunci Jawaban
+                            </button>
+                        </div>
+
+                        <!-- Hidden until 'Cek Jawaban' is clicked -->
+                        <div id="oralGradingContainer" class="hidden">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                                <h3 class="font-bold text-yellow-800 mb-2 flex items-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Indikator Jawaban (Untuk Guru):
+                                </h3>
+                                <p id="indicatorText" class="text-sm text-yellow-900"></p>
+                            </div>
+                            
+                            <p class="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Rubrik Penilaian Guru:</p>
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <button onclick="handleOralGrade(100)" class="flex-1 py-3 px-4 bg-green-100 hover:bg-green-200 text-green-800 font-bold rounded-xl border border-green-300 transition-colors">
+                                    Benar (100)
+                                </button>
+                                <button onclick="handleOralGrade(50)" class="flex-1 py-3 px-4 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded-xl border border-blue-300 transition-colors">
+                                    Sebagian Benar (50)
+                                </button>
+                                <button onclick="handleOralGrade(0)" class="flex-1 py-3 px-4 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-xl border border-red-300 transition-colors">
+                                    Salah (0)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feedback Area (Initially Hidden) -->
+                    <div id="feedbackArea" class="hidden mt-6 pt-6 border-t border-gray-200">
+                        <div id="feedbackResult" class="flex items-center gap-3 mb-4">
+                            <!-- Icon and Result Text injected here -->
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-bold text-gray-700 mb-1">Pembahasan:</h4>
+                            <p id="explanationText" class="text-sm text-gray-600"></p>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button onclick="closeModalAndContinue()" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-full shadow-lg transition-transform hover:scale-105 active:scale-95">
+                                Lanjut Kembali ke Permainan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameOverScreen" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-40 hidden flex items-center justify-center rounded-xl">
+            <div class="text-center p-8 bg-white rounded-3xl shadow-2xl border-4 border-emerald-400 max-w-md w-full animate-pop-in">
+                <h1 class="text-4xl font-bold text-emerald-600 fredoka-font mb-2">BounceQuiz Selesai!</h1>
+                <p class="text-gray-500 mb-8 font-semibold">Kerja bagus menyelesaikan semua soal!</p>
+                
+                <div class="bg-slate-50 rounded-2xl p-6 mb-8 border border-slate-200">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-3 bg-white rounded-xl shadow-sm">
+                            <p class="text-xs text-slate-400 uppercase font-bold mb-1">Total Soal</p>
+                            <p class="text-3xl font-bold text-slate-700">20</p>
+                        </div>
+                        <div class="text-center p-3 bg-white rounded-xl shadow-sm">
+                            <p class="text-xs text-slate-400 uppercase font-bold mb-1">Skor Akhir</p>
+                            <p id="finalScore" class="text-3xl font-bold text-emerald-500">0</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="resetGame()" class="w-full py-4 bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-white font-bold rounded-full shadow-lg text-lg transition-transform hover:scale-105 active:scale-95">
+                    Main Lagi!
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- DATA SOAL (20 Soal) ---
+        // 14 Multiple Choice, 6 Oral Answer
+        const questionData = [
+            // Multiple Choice (1-14)
+            {
+                id: 1,
+                type: 'mc',
+                question: "Bangsa Eropa pertama kali datang ke Indonesia pada awal abad ke-16. Tujuan utama kedatangan mereka saat itu adalah...",
+                options: [
+                    "A. Membantu rakyat Indonesia melawan penjajah",
+                    "B. Menyebarkan agama Islam di Nusantara",
+                    "C. Mencari rempah-rempah yang mahal di Eropa",
+                    "D. Membangun pabrik senjata di pulau Jawa"
+                ],
+                correctAnswerIndex: 2, // C
+                explanation: "Tujuan utama awal kedatangan bangsa Eropa (seperti Portugis dan Spanyol) adalah mencari sumber rempah-rempah langsung, karena harganya sangat mahal di Eropa pada saat itu."
+            },
+            {
+                id: 2,
+                type: 'mc',
+                question: "Bangsa Barat yang pertama kali berhasil mencapai Kepulauan Maluku (pusat rempah-rempah) pada tahun 1512 adalah...",
+                options: [
+                    "A. Portugis",
+                    "B. Spanyol",
+                    "C. Belanda",
+                    "D. Inggris"
+                ],
+                correctAnswerIndex: 0, // A
+                explanation: "Bangsa Portugis di bawah pimpinan Alfonso de Albuquerque berhasil menguasai Malaka pada 1511, lalu pada 1512 ekspedisi yang dipimpin Antonio de Abreu mencapai Maluku."
+            },
+            {
+                id: 3,
+                type: 'mc',
+                question: "Alasan mengapa rempah-rempah dari Indonesia sangat dicari oleh bangsa Eropa pada masa itu adalah...",
+                options: [
+                    "A. Untuk bahan bakar kapal layar mereka",
+                    "B. Untuk mengawetkan makanan dan bumbu masakan",
+                    "C. Sebagai bahan dasar pembuatan pakaian sutra",
+                    "D. Untuk membangun rumah yang kuat menghadapi musim dingin"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "Di Eropa yang beriklim dingin, rempah-rempah sangat dibutuhkan untuk menghangatkan badan, bumbu masakan, dan yang terpenting untuk mengawetkan daging saat musim dingin."
+            },
+            {
+                id: 4,
+                type: 'mc',
+                question: "Rombongan kapal Belanda pertama kali tiba di Banten pada tahun 1596. Rombongan ini dipimpin oleh...",
+                options: [
+                    "A. Thomas Stamford Raffles",
+                    "B. Herman Willem Daendels",
+                    "C. Cornelis de Houtman",
+                    "D. Jan Pieterszoon Coen"
+                ],
+                correctAnswerIndex: 2, // C
+                explanation: "Cornelis de Houtman memimpin armada Belanda yang pertama kali tiba di pelabuhan Banten pada tahun 1596, meskipun awalnya mereka diusir karena bersikap kasar."
+            },
+            {
+                id: 5,
+                type: 'mc',
+                question: "Untuk menghindari persaingan tidak sehat antar pedagang Belanda sendiri dan memperkuat posisi melawan bangsa lain, pemerintah Belanda membentuk kongsi dagang bernama...",
+                options: [
+                    "A. EIC (East India Company)",
+                    "B. VOC (Vereenigde Oostindische Compagnie)",
+                    "C. KNIL (Koninklijk Nederlandsch-Indisch Leger)",
+                    "D. NICA (Netherlands Indies Civil Administration)"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "VOC didirikan pada 20 Maret 1602 untuk memonopoli perdagangan rempah-rempah di Nusantara dan mengurangi persaingan antar pedagang Belanda."
+            },
+            {
+                id: 6,
+                type: 'mc',
+                question: "VOC diberikan hak istimewa oleh pemerintah Belanda yang disebut hak Oktroi. Berikut ini yang BUKAN merupakan hak istimewa VOC adalah...",
+                options: [
+                    "A. Hak mencetak mata uang sendiri",
+                    "B. Hak memiliki tentara sendiri",
+                    "C. Hak menyatakan perang atau damai",
+                    "D. Hak memilih presiden Belanda"
+                ],
+                correctAnswerIndex: 3, // D
+                explanation: "Hak Oktroi memberi VOC kekuasaan seperti negara di dalam negara (mencetak uang, punya tentara, menyatakan perang), tetapi tidak termasuk hak memilih presiden Belanda (karena Belanda saat itu berbentuk kerajaan)."
+            },
+            {
+                id: 7,
+                type: 'mc',
+                question: "Sistem kerja paksa pada masa penjajahan Belanda yang mewajibkan rakyat bekerja tanpa upah untuk membangun jalan raya Anyer-Panarukan disebut...",
+                options: [
+                    "A. Romusha",
+                    "B. Kerja Rodi",
+                    "C. Tanam Paksa",
+                    "D. Monopoli Perdagangan"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "Kerja Rodi diterapkan pada masa Gubernur Jenderal Herman Willem Daendels, salah satu proyek terbesarnya adalah Jalan Raya Pos (Anyer-Panarukan)."
+            },
+            {
+                id: 8,
+                type: 'mc',
+                question: "Kebijakan Cultuurstelsel (Tanam Paksa) yang sangat menyengsarakan rakyat Indonesia dicetuskan oleh Gubernur Jenderal...",
+                options: [
+                    "A. Johannes van den Bosch",
+                    "B. J.P. Coen",
+                    "C. Eduard Douwes Dekker",
+                    "D. Baron van Hoevel"
+                ],
+                correctAnswerIndex: 0, // A
+                explanation: "Johannes van den Bosch mencetuskan Tanam Paksa pada tahun 1830 untuk mengisi kekosongan kas negara Belanda akibat perang."
+            },
+            {
+                id: 9,
+                type: 'mc',
+                question: "Buku berjudul 'Max Havelaar' menceritakan tentang penderitaan rakyat Banten akibat sistem tanam paksa. Penulis buku ini menggunakan nama samaran Multatuli. Siapakah nama aslinya?",
+                options: [
+                    "A. J.P. Coen",
+                    "B. Eduard Douwes Dekker",
+                    "C. Cornelis Speelman",
+                    "D. Van der Capellen"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "Eduard Douwes Dekker (Multatuli) menulis Max Havelaar untuk mengkritik keras sistem tanam paksa yang menyengsarakan rakyat pribumi."
+            },
+            {
+                id: 10,
+                type: 'mc',
+                question: "Bangsa Inggris juga pernah menguasai Indonesia secara singkat (1811-1816). Salah satu peninggalan Gubernur Jenderal Thomas Stamford Raffles yang terkenal di bidang ilmu pengetahuan adalah...",
+                options: [
+                    "A. Membangun Istana Bogor",
+                    "B. Menulis buku History of Java dan menemukan bunga Rafflesia Arnoldii",
+                    "C. Membangun jalan kereta api pertama di Jawa",
+                    "D. Mendirikan kota Batavia"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "Raffles memiliki minat besar pada ilmu pengetahuan. Ia menulis buku History of Java dan namanya diabadikan pada bunga bangkai (Rafflesia Arnoldii) yang ditemukan bersama Dr. Joseph Arnold."
+            },
+            {
+                id: 11,
+                type: 'mc',
+                question: "Perlawanan rakyat Maluku terhadap kekejaman penjajah Belanda dipimpin oleh pahlawan nasional yang bernama...",
+                options: [
+                    "A. Pangeran Diponegoro",
+                    "B. Tuanku Imam Bonjol",
+                    "C. Kapitan Pattimura",
+                    "D. Sultan Hasanuddin"
+                ],
+                correctAnswerIndex: 2, // C
+                explanation: "Thomas Matulessy atau Kapitan Pattimura memimpin perlawanan rakyat Maluku terhadap Belanda pada tahun 1817."
+            },
+            {
+                id: 12,
+                type: 'mc',
+                question: "Pangeran Diponegoro memimpin perang besar di pulau Jawa melawan pemerintah Hindia Belanda pada tahun 1825-1830. Penyebab khusus meletusnya perang ini adalah...",
+                options: [
+                    "A. Belanda memonopoli perdagangan cengkih di Jawa",
+                    "B. Belanda memasang patok jalan di atas makam leluhur Pangeran Diponegoro",
+                    "C. Belanda memaksa rakyat Jawa menanam kopi",
+                    "D. Belanda menangkap raja-raja Jawa tanpa alasan"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "Penyebab khusus (pemicu) Perang Diponegoro adalah tindakan provokatif Belanda yang memasang patok jalan menembus tanah makam leluhur Pangeran Diponegoro di Tegalrejo."
+            },
+            {
+                id: 13,
+                type: 'mc',
+                question: "Sultan Hasanuddin, Raja Gowa, memimpin perlawanan terhadap VOC di Sulawesi Selatan. Karena keberaniannya, Belanda memberinya julukan...",
+                options: [
+                    "A. Mutiara dari Timur",
+                    "B. Harimau dari Selatan",
+                    "C. Ayam Jantan dari Timur",
+                    "D. Singa Padang Pasir"
+                ],
+                correctAnswerIndex: 2, // C
+                explanation: "Sultan Hasanuddin dijuluki 'De Haantjes van Het Oosten' atau Ayam Jantan dari Timur oleh Belanda karena keberaniannya menentang monopoli VOC."
+            },
+            {
+                id: 14,
+                type: 'mc',
+                question: "VOC pada akhirnya bangkrut dan dibubarkan pada tanggal 31 Desember 1799. Salah satu penyebab utama kebangkrutan VOC adalah...",
+                options: [
+                    "A. Serangan militer dari kerajaan-kerajaan di Eropa",
+                    "B. Korupsi yang merajalela di kalangan pegawai VOC",
+                    "C. Rempah-rempah sudah tidak laku lagi di Eropa",
+                    "D. Kapal-kapal VOC hancur terkena badai tsunami"
+                ],
+                correctAnswerIndex: 1, // B
+                explanation: "Faktor internal utama runtuhnya VOC adalah korupsi besar-besaran yang dilakukan oleh para pegawainya sendiri, selain biaya perang yang tinggi untuk menumpas perlawanan daerah."
+            },
+            
+            // Oral Answer (15-20)
+            {
+                id: 15,
+                type: 'oral',
+                question: "Jelaskan dengan bahasamu sendiri, apa tujuan utama bangsa Eropa (seperti Spanyol, Portugis, dan Belanda) datang berlayar hingga ke Nusantara/Indonesia pada masa lalu?",
+                indicator: "Jawaban siswa harus mencakup: 1. Mencari rempah-rempah. 2. Karena di Eropa rempah-rempah sangat mahal/langka. (Tambahan bagus: 3G - Gold, Glory, Gospel).",
+                explanation: "Tujuan utama mereka adalah motif ekonomi, yaitu mencari daerah penghasil rempah-rempah untuk memonopoli perdagangannya, menyebarkan agama, dan mencari kejayaan (Gold, Glory, Gospel)."
+            },
+            {
+                id: 16,
+                type: 'oral',
+                question: "Apa itu VOC (Vereenigde Oostindische Compagnie)? Jelaskan secara singkat mengapa Belanda merasa perlu mendirikan VOC di Indonesia!",
+                indicator: "Jawaban siswa harus mencakup: 1. Kongsi/perserikatan dagang Belanda. 2. Tujuan didirikan untuk menghindari persaingan antar pedagang Belanda sendiri dan memonopoli perdagangan di Nusantara.",
+                explanation: "VOC adalah kongsi dagang Belanda yang didirikan untuk menyatukan pedagang Belanda agar tidak saling bersaing, serta memperkuat diri menghadapi persaingan dengan bangsa Eropa lain seperti Inggris (EIC)."
+            },
+            {
+                id: 17,
+                type: 'oral',
+                question: "Sebutkan minimal 3 dampak negatif atau kerugian yang dialami rakyat Indonesia akibat kebijakan penjajahan Belanda seperti Kerja Rodi atau Tanam Paksa!",
+                indicator: "Jawaban harus menyebutkan minimal 3 dari: Kelaparan, kemiskinan, banyak yang sakit/meninggal karena kerja berat, tanah pertanian terbengkalai, hasil panen dirampas.",
+                explanation: "Kebijakan penjajah membuat rakyat menderita karena dipaksa bekerja tanpa upah yang layak, fokus menanam tanaman ekspor sehingga sawah sendiri terbengkalai yang berujung pada wabah kelaparan dan kematian."
+            },
+            {
+                id: 18,
+                type: 'oral',
+                question: "Sebutkan 3 nama pahlawan daerah yang berjuang melawan penjajahan Belanda pada masa sebelum pergerakan nasional, beserta daerah asalnya!",
+                indicator: "Siswa harus menyebutkan 3 pasang (Pahlawan - Daerah). Contoh: Pattimura (Maluku), Diponegoro (Jawa Tengah/Yogyakarta), Imam Bonjol (Minangkabau/Sumbar), Sultan Hasanuddin (Makassar), Teuku Umar/Cut Nyak Dien (Aceh).",
+                explanation: "Perjuangan pada masa ini bersifat kedaerahan. Tokoh-tokoh seperti Pattimura (Maluku), Pangeran Diponegoro (Jawa), dan Sultan Hasanuddin (Makassar) berjuang mati-matian mempertahankan daerahnya masing-masing."
+            },
+            {
+                id: 19,
+                type: 'oral',
+                question: "Mengapa perlawanan rakyat Indonesia terhadap penjajah Belanda di berbagai daerah pada masa lampau sering kali mengalami kegagalan?",
+                indicator: "Jawaban harus mencakup gagasan: 1. Perlawanan masih bersifat kedaerahan (berjuang sendiri-sendiri, belum bersatu se-Indonesia). 2. Persenjataan Belanda lebih modern. 3. Sering terkena politik adu domba (Devide et Impera).",
+                explanation: "Kelemahan utama perjuangan bangsa Indonesia saat itu adalah kurangnya persatuan karena masih bersifat kedaerahan. Selain itu, Belanda licik menggunakan taktik Devide et Impera (adu domba) dan memiliki persenjataan yang lebih maju."
+            },
+            {
+                id: 20,
+                type: 'oral',
+                question: "Menurut pendapatmu, pelajaran berharga apa yang bisa kita ambil dari sejarah perjuangan para pahlawan dalam melawan penjajah?",
+                indicator: "Jawaban bersifat opini, namun harus positif. Contoh: Pentingnya persatuan dan kesatuan, pantang menyerah, rela berkorban untuk negara, harus rajin belajar agar bangsa kita pintar dan tidak mudah dibodohi bangsa lain.",
+                explanation: "Sejarah mengajarkan bahwa tanpa persatuan, kita mudah dihancurkan. Sikap pantang menyerah dan cinta tanah air dari para pahlawan harus kita teladani dalam mengisi kemerdekaan saat ini."
+            }
+        ];
+
+        // --- GAME LOGIC ---
+        // State Variables
+        let currentScore = 0;
+        let questionsAnswered = 0;
+        const totalQuestions = 20;
+        let isGamePaused = false;
+        let activeQuestionId = null;
+        let balls = [];
+
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvasContainer');
+
+        function resizeCanvas() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Ball Class
+        class Ball {
+            constructor(id) {
+                this.id = id;
+                this.radius = 25;
+                // Random position within bounds
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+                
+                // Random velocity
+                const speed = 2 + Math.random() * 2;
+                const angle = Math.random() * Math.PI * 2;
+                this.dx = Math.cos(angle) * speed;
+                this.dy = Math.sin(angle) * speed;
+                
+                this.color = this.getRandomColor();
+                this.isDone = false; // Mark true when answered
+                this.isHovered = false;
+            }
+
+            getRandomColor() {
+                const colors = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4', '#14b8a6', '#10b981', '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                
+                if (this.isDone) {
+                    ctx.fillStyle = '#cbd5e1'; // Greyed out
+                    ctx.globalAlpha = 0.5;
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.globalAlpha = 1.0;
+                    if (this.isHovered) {
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                    } else {
+                        ctx.shadowBlur = 0;
+                    }
+                }
+                
+                ctx.fill();
+                ctx.closePath();
+
+                // Draw Text (ID)
+                ctx.fillStyle = this.isDone ? '#94a3b8' : '#ffffff';
+                ctx.font = 'bold 20px Fredoka';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.id, this.x, this.y);
+                ctx.globalAlpha = 1.0; // Reset alpha
+            }
+
+            update() {
+                if (this.isDone || isGamePaused) return;
+
+                // Bounce off walls
+                if (this.x + this.dx > canvas.width - this.radius || this.x + this.dx < this.radius) {
+                    this.dx = -this.dx;
+                }
+                if (this.y + this.dy > canvas.height - this.radius || this.y + this.dy < this.radius) {
+                    this.dy = -this.dy;
+                }
+
+                this.x += this.dx;
+                this.y += this.dy;
+            }
+        }
+
+        function initBalls() {
+            balls = [];
+            for (let i = 1; i <= totalQuestions; i++) {
+                balls.push(new Ball(i));
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            balls.forEach(ball => {
+                ball.update();
+                ball.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Interaction handling
+        let mouseX = 0;
+        let mouseY = 0;
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isGamePaused) return;
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+
+            let isHovering = false;
+            balls.forEach(ball => {
+                if (!ball.isDone) {
+                    const dist = Math.hypot(mouseX - ball.x, mouseY - ball.y);
+                    if (dist < ball.radius) {
+                        ball.isHovered = true;
+                        isHovering = true;
+                    } else {
+                        ball.isHovered = false;
+                    }
+                }
+            });
+            canvas.style.cursor = isHovering ? 'pointer' : 'default';
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (isGamePaused) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            for (let ball of balls) {
+                if (!ball.isDone) {
+                    const dist = Math.hypot(clickX - ball.x, clickY - ball.y);
+                    if (dist < ball.radius) {
+                        openQuestion(ball.id);
+                        break;
+                    }
+                }
+            }
+        });
+
+        // UI Logic
+        const modal = document.getElementById('questionModal');
+        const mcArea = document.getElementById('mcArea');
+        const oralArea = document.getElementById('oralArea');
+        const feedbackArea = document.getElementById('feedbackArea');
+
+        function openQuestion(id) {
+            isGamePaused = true;
+            activeQuestionId = id;
+            
+            const q = questionData.find(item => item.id === id);
+            
+            // Reset Modal UI
+            document.getElementById('modalQuestionNumber').textContent = id;
+            document.getElementById('questionText').textContent = q.question;
+            feedbackArea.classList.add('hidden');
+            mcArea.classList.add('hidden');
+            oralArea.classList.add('hidden');
+            mcArea.innerHTML = ''; // Clear old options
+
+            if (q.type === 'mc') {
+                document.getElementById('questionTypeBadge').textContent = 'Pilihan Ganda';
+                document.getElementById('questionTypeBadge').className = 'px-3 py-1 bg-blue-600 rounded-full text-xs font-bold uppercase';
+                mcArea.classList.remove('hidden');
+                
+                q.options.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'mc-btn w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 font-semibold text-gray-700 focus:outline-none';
+                    btn.textContent = opt;
+                    btn.onclick = () => handleMCAnswer(index, q.correctAnswerIndex, btn);
+                    mcArea.appendChild(btn);
+                });
+            } else {
+                document.getElementById('questionTypeBadge').textContent = 'Uraian / Lisan';
+                document.getElementById('questionTypeBadge').className = 'px-3 py-1 bg-yellow-500 rounded-full text-xs font-bold uppercase';
+                oralArea.classList.remove('hidden');
+                document.getElementById('indicatorText').textContent = q.indicator;
+                
+                // Show 'Cek Jawaban' button and hide grading controls initially
+                document.getElementById('revealOralBtnContainer').classList.remove('hidden');
+                document.getElementById('oralGradingContainer').classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function revealOralKey() {
+            document.getElementById('revealOralBtnContainer').classList.add('hidden');
+            document.getElementById('oralGradingContainer').classList.remove('hidden');
+        }
+
+        function handleMCAnswer(selectedIndex, correctIndex, selectedButton) {
+            // Disable all buttons to prevent multiple clicks
+            const buttons = mcArea.querySelectorAll('button');
+            buttons.forEach(btn => btn.disabled = true);
+
+            const isCorrect = selectedIndex === correctIndex;
+            let pointsEarned = 0;
+
+            if (isCorrect) {
+                selectedButton.classList.replace('border-gray-200', 'border-green-500');
+                selectedButton.classList.replace('hover:bg-blue-50', 'bg-green-100');
+                selectedButton.classList.add('text-green-800');
+                pointsEarned = 100;
+                showFeedback(true, pointsEarned);
+            } else {
+                selectedButton.classList.replace('border-gray-200', 'border-red-500');
+                selectedButton.classList.replace('hover:bg-blue-50', 'bg-red-100');
+                selectedButton.classList.add('text-red-800');
+                
+                // Highlight correct answer
+                buttons[correctIndex].classList.replace('border-gray-200', 'border-green-500');
+                buttons[correctIndex].classList.add('bg-green-50');
+                
+                showFeedback(false, 0);
+            }
+
+            updateScore(pointsEarned);
+        }
+
+        function handleOralGrade(points) {
+            updateScore(points);
+            showFeedback(points > 0, points); // Show positive feedback if points > 0
+            
+            // Hide oral grading buttons after grading
+            oralArea.classList.add('hidden');
+        }
+
+        function showFeedback(isPositive, points) {
+            feedbackArea.classList.remove('hidden');
+            const resultContainer = document.getElementById('feedbackResult');
+            const q = questionData.find(item => item.id === activeQuestionId);
+            
+            document.getElementById('explanationText').textContent = q.explanation;
+
+            if (isPositive) {
+                resultContainer.innerHTML = `
+                    <div class="bg-green-100 text-green-600 p-2 rounded-full">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-green-600 fredoka-font">Jawaban Tepat!</h3>
+                        <p class="text-sm text-green-800 font-bold">+${points} Poin</p>
+                    </div>
+                `;
+            } else {
+                resultContainer.innerHTML = `
+                    <div class="bg-red-100 text-red-600 p-2 rounded-full">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-red-600 fredoka-font">Kurang Tepat!</h3>
+                        <p class="text-sm text-red-800 font-bold">+0 Poin</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateScore(points) {
+            currentScore += points;
+            document.getElementById('scoreText').textContent = currentScore;
+        }
+
+        function closeModalAndContinue() {
+            modal.classList.add('hidden');
+            
+            // Mark ball as done
+            const ball = balls.find(b => b.id === activeQuestionId);
+            if (ball) {
+                ball.isDone = true;
+                // Move finished balls to bottom corner so they are out of the way but visible
+                ball.x = canvas.width - ball.radius - (questionsAnswered % 5) * (ball.radius * 2);
+                ball.y = canvas.height - ball.radius - Math.floor(questionsAnswered / 5) * (ball.radius * 2);
+            }
+
+            questionsAnswered++;
+            document.getElementById('progressText').textContent = questionsAnswered;
+
+            if (questionsAnswered >= totalQuestions) {
+                showGameOver();
+            } else {
+                isGamePaused = false;
+                canvas.style.cursor = 'default';
+            }
+        }
+
+        function showGameOver() {
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('finalScore').textContent = currentScore;
+        }
+
+        function resetGame() {
+            currentScore = 0;
+            questionsAnswered = 0;
+            document.getElementById('scoreText').textContent = '0';
+            document.getElementById('progressText').textContent = '0';
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            
+            initBalls();
+            isGamePaused = false;
+        }
+
+        // Start game
+        window.onload = () => {
+            initBalls();
+            animate();
+        };
+
+    </script>
+</body>
+</html>
